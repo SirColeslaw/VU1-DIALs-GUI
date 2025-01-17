@@ -16,26 +16,53 @@ class VU1GUI(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("VU1 GUI Prototype")
-        self.minsize(1170, 1100)  # Setze die Mindestgröße des Fensters
+        # DPI-Awareness für Windows aktivieren
+        try:
+            from ctypes import windll
+            windll.shcore.SetProcessDpiAwareness(2)  # PROCESS_PER_MONITOR_DPI_AWARE
+        except:
+            pass
 
-        # Load saved settings or set defaults
+        # Load saved settings first
         self.settings_file = "settings.json"
         self.settings = self.load_settings()
 
-        # Setze die Fenstergröße und Position basierend auf den gespeicherten Einstellungen
-        self.initial_geometry_set = False
-        if "window_width" in self.settings and "window_height" in self.settings and "window_x" in self.settings and "window_y" in self.settings:
+        # Set window title and minimum size
+        self.title("VU1 GUI Prototype")
+        self.minsize(1170, 1100)
+
+        # Get the current screen's scaling factor
+        self.scaling_factor = self.get_scaling_factor()
+        print(f"Current scaling factor: {self.scaling_factor}")
+
+        # Restore window size and position
+        if all(key in self.settings for key in ["window_width", "window_height", "window_x", "window_y"]):
             w = self.settings["window_width"]
             h = self.settings["window_height"]
             x = self.settings["window_x"]
             y = self.settings["window_y"]
-            print(f"Loading window size: {w}x{h} at {x}x{y}")  # Debug-Ausgabe
-            self.geometry(f"{w}x{h}+{x}+{y}")
-            self.initial_geometry_set = True
+            
+            # Get screen dimensions
+            screen_width = self.winfo_screenwidth()
+            screen_height = self.winfo_screenheight()
+            
+            print(f"Screen dimensions: {screen_width}x{screen_height}")
+            print(f"Attempting to restore window to: {w}x{h}+{x}+{y}")
+            
+            # Ensure window is visible on screen
+            if (0 <= x < screen_width and 
+                0 <= y < screen_height and 
+                100 <= w <= screen_width and 
+                100 <= h <= screen_height):
+                
+                self.geometry(f"{w}x{h}+{x}+{y}")
+                print(f"Window geometry set to: {w}x{h}+{x}+{y}")
+            else:
+                print("Using default geometry")
+                self.geometry("1370x1420+100+100")
         else:
-            print("No saved settings found, setting default window size.")  # Debug-Ausgabe
-            self.geometry("1370x1420")  # Setze die anfängliche Größe des Hauptfensters auf 1370x1420
+            print("No saved geometry found")
+            self.geometry("1370x1420+100+100")
 
         self.server_address = ctk.StringVar(value=self.settings.get("server_address", "http://localhost:5340"))
         self.api_key = ctk.StringVar(value=self.settings.get("api_key", ""))
@@ -78,10 +105,23 @@ class VU1GUI(ctk.CTk):
 
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        # Setze die Fenstergröße und Position erneut, um sicherzustellen, dass sie korrekt angewendet werden
-        if self.initial_geometry_set:
-            self.geometry(f"{w}x{h}+{x}+{y}")
-            print(f"Reapplying window size: {w}x{h} at {x}x{y}")  # Debug-Ausgabe
+    def get_scaling_factor(self):
+        try:
+            from ctypes import windll
+            from ctypes.wintypes import HMONITOR
+            from ctypes import c_int
+            
+            # Get the monitor where the window is
+            monitor = windll.user32.MonitorFromWindow(self.winfo_id(), 0)
+            
+            # Get DPI
+            x_dpi = c_int()
+            y_dpi = c_int()
+            windll.shcore.GetDpiForMonitor(monitor, 0, x_dpi, y_dpi)
+            
+            return x_dpi.value / 96.0
+        except:
+            return 1.0
 
     def load_settings(self):
         if os.path.exists(self.settings_file):
@@ -92,15 +132,16 @@ class VU1GUI(ctk.CTk):
         return {}
 
     def save_settings(self):
+        # Speichere die tatsächlichen Pixelwerte ohne Skalierung
         settings = {
             "server_address": self.server_address.get(),
             "api_key": self.api_key.get(),
-            "window_width": self.winfo_width(),  # Fensterbreite speichern
-            "window_height": self.winfo_height(),  # Fensterhöhe speichern
-            "window_x": self.winfo_rootx(),  # Fensterposition X speichern
-            "window_y": self.winfo_rooty()   # Fensterposition Y speichern
+            "window_width": self.winfo_width(),
+            "window_height": self.winfo_height(),
+            "window_x": self.winfo_x(),
+            "window_y": self.winfo_y()
         }
-        print(f"Saving settings: {settings}")  # Debug-Ausgabe
+        print(f"Saving actual window dimensions: {settings}")
         with open(self.settings_file, "w") as file:
             json.dump(settings, file)
 
@@ -387,17 +428,24 @@ class VU1GUI(ctk.CTk):
         self.save_assignments()
 
     def update_dial_with_sensor_data(self, dial_id):
-        # Update the dial with the assigned sensor data
-        sensor = self.sensor_assignments.get(dial_id)
-        if sensor:
+        # Füge Fehlerbehandlung hinzu
+        try:
+            sensor = self.sensor_assignments.get(dial_id)
+            if not sensor:
+                return
+                
             sensor_id = sensor.split('(')[-1].strip(')')
-            sensor_data = next((item for item in self.aida64_data.get('temp', []) if item['id'] == sensor_id), None)
-            if sensor_data:
+            sensor_data = next((item for item in self.aida64_data.get('temp', []) 
+                              if item['id'] == sensor_id), None)
+            
+            if sensor_data and 'value' in sensor_data:
                 value = float(sensor_data['value'])
                 min_value = self.min_values.get(dial_id, 0)
                 max_value = self.max_values.get(dial_id, 100)
                 mapped_value = self.map_value_to_range(value, min_value, max_value)
                 self.set_dial_value(dial_id, mapped_value)
+        except Exception as e:
+            print(f"Error updating dial {dial_id}: {e}")
 
     def map_value_to_range(self, value, min_value, max_value):
         return max(0, min(100, (value - min_value) / (max_value - min_value) * 100))
@@ -613,11 +661,18 @@ class VU1GUI(ctk.CTk):
                 widget.set(sensor)
 
     def on_close(self):
-        self.settings["window_width"] = self.winfo_width()
-        self.settings["window_height"] = self.winfo_height()
-        self.settings["window_x"] = self.winfo_rootx()
-        self.settings["window_y"] = self.winfo_rooty()
-        print(f"Window size on close: {self.winfo_width()}x{self.winfo_height()} at {self.winfo_rootx()}x{self.winfo_rooty()}")  # Debug-Ausgabe
+        # Aktualisiere die Einstellungen mit der aktuellen Fenstergeometrie
+        current_geometry = self.geometry()
+        self.settings.update({
+            "window_width": self.winfo_width(),
+            "window_height": self.winfo_height(),
+            "window_x": self.winfo_x(),
+            "window_y": self.winfo_y(),
+            "server_address": self.server_address.get(),
+            "api_key": self.api_key.get()
+        })
+        
+        print(f"Saving window geometry: {self.winfo_width()}x{self.winfo_height()}+{self.winfo_x()}+{self.winfo_y()}")
         self.save_settings()
         self.destroy()
 
