@@ -230,8 +230,8 @@ class VU1GUI(QMainWindow):
     def __init__(self):
         super().__init__()
         
-        # Register for Windows shutdown events
-        self.register_shutdown_handler()
+        # Instead, connect to QApplication's aboutToQuit signal
+        QApplication.instance().aboutToQuit.connect(self.shutdown_dials)
         
         # Load settings from JSON file
         self.settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
@@ -301,29 +301,6 @@ class VU1GUI(QMainWindow):
             self.tray_icon.show()
         else:
             self.show()
-
-    def register_shutdown_handler(self):
-        """Register Windows event handler for shutdown"""
-        def wnd_proc(hwnd, msg, wparam, lparam):
-            if msg == win32con.WM_QUERYENDSESSION:
-                self.shutdown_dials()
-                return True
-            return False
-
-        # Create a hidden window to receive windows messages
-        wc = win32gui.WNDCLASS()
-        wc.lpfnWndProc = wnd_proc
-        wc.lpszClassName = "VU1GUIShutdownHandler"
-        try:
-            win32gui.RegisterClass(wc)
-            self.hwnd = win32gui.CreateWindow(
-                wc.lpszClassName,
-                "VU1GUI",
-                0, 0, 0, 0, 0,
-                0, 0, 0, None
-            )
-        except Exception as e:
-            print(f"Error registering shutdown handler: {e}")
 
     def load_settings(self):
         """Loads the settings from the JSON file"""
@@ -1013,4 +990,5 @@ if __name__ == "__main__":
     window = VU1GUI()
     # window.show() has been moved to the __init__ method
     sys.exit(app.exec())
+``` 
 
