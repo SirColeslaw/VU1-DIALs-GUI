@@ -243,6 +243,7 @@ class VU1GUI(QMainWindow):
         self.start_in_tray = self.settings.get("start_in_tray", False)
         self.server_address = self.settings.get("server_address", "")  # Changed to empty string
         self.api_key = self.settings.get("api_key", "")  # Changed to empty string
+        self.backlight_values = {}  # Initialize backlight_values
         
         # Basic window setup
         self.setWindowTitle("VU1 GUI")
