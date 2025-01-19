@@ -227,17 +227,30 @@ class VU1GUI(QMainWindow):
     def __init__(self):
         super().__init__()
         
-        # Load settings from JSON file
-        self.settings_file = "settings.json"
+        # Connect to QApplication's aboutToQuit signal
+        QApplication.instance().aboutToQuit.connect(self.shutdown_dials)
+        
+        # Get the correct base path whether running as script or exe
+        if getattr(sys, 'frozen', False):
+            # Running as exe
+            self.base_path = os.path.dirname(sys.executable)
+        else:
+            # Running as script
+            self.base_path = os.path.dirname(os.path.abspath(__file__))
+        
+        # Load settings from JSON file with correct path
+        self.settings_file = os.path.join(self.base_path, "settings.json")
+        self.assignments_file = os.path.join(self.base_path, "assignments.json")
+        
         self.settings = self.load_settings()
         
-        # Initialize settings with default values
+        # Initialize settings with default values but prefer loaded settings
         self.autostart_enabled = self.settings.get("autostart", False)
         self.minimize_to_tray = self.settings.get("minimize_to_tray", False)
-        self.start_in_tray = self.settings.get("start_in_tray", False)  # Neue Einstellung
-        self.server_address = self.settings.get("server_address", "http://localhost:5340")
-        self.api_key = self.settings.get("api_key", "")
-        self.backlight_values = {}  # Neue Variable für Backlight-Werte
+        self.start_in_tray = self.settings.get("start_in_tray", False)
+        self.server_address = self.settings.get("server_address", "http://localhost:5340")  # Set default server address
+        self.api_key = self.settings.get("api_key", "")  # Changed to empty string
+        self.backlight_values = {}  # Initialize backlight_values
         
         # Basic window setup
         self.setWindowTitle("VU1 GUI")
@@ -254,7 +267,6 @@ class VU1GUI(QMainWindow):
         self.sensor_assignments = {}
         self.min_values = {}
         self.max_values = {}
-        self.assignments_file = "assignments.json"
         
         # GUI setup
         self.setup_ui()
@@ -302,9 +314,10 @@ class VU1GUI(QMainWindow):
             if os.path.exists(self.settings_file):
                 with open(self.settings_file, "r") as file:
                     settings = json.load(file)
+                    # Validate required settings
+                    if not settings.get("server_address") or not settings.get("api_key"):
+                        return {}
                     return settings
-            return {}
-        except FileNotFoundError:
             return {}
         except Exception as e:
             print(f"Error loading settings: {e}")
@@ -953,21 +966,27 @@ class VU1GUI(QMainWindow):
         """Set all dials to 0 and turn off the light."""
         try:
             for dial_id in self.dial_widgets.keys():
-                # Set value to 0
-                url = f"{self.server_address}/api/v0/dial/{dial_id}/set"
-                params = {"key": self.api_key, "value": 0}
-                requests.get(url, params=params)
-                
-                # Turn off backlight
-                url = f"{self.server_address}/api/v0/dial/{dial_id}/backlight"
-                params = {
-                    "key": self.api_key,
-                    "red": 0,
-                    "green": 0,
-                    "blue": 0
-                }
-                requests.get(url, params=params)
-                
+                try:
+                    # Set value to 0
+                    url = f"{self.server_address}/api/v0/dial/{dial_id}/set"
+                    params = {"key": self.api_key, "value": 0}
+                    requests.get(url, params=params, timeout=1)
+                    
+                    # Turn off backlight
+                    url = f"{self.server_address}/api/v0/dial/{dial_id}/backlight"
+                    params = {
+                        "key": self.api_key,
+                        "red": 0,
+                        "green": 0,
+                        "blue": 0
+                    }
+                    requests.get(url, params=params, timeout=1)
+                except requests.exceptions.Timeout:
+                    continue  # Skip to next dial if timeout occurs
+                except Exception as e:
+                    print(f"Error shutting down dial {dial_id}: {e}")
+                    continue
+                    
         except Exception as e:
             print(f"Error when shutting down the dials: {e}")
 
