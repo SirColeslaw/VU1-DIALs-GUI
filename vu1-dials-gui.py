@@ -230,8 +230,18 @@ class VU1GUI(QMainWindow):
         # Connect to QApplication's aboutToQuit signal
         QApplication.instance().aboutToQuit.connect(self.shutdown_dials)
         
-        # Load settings from JSON file
-        self.settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
+        # Get the correct base path whether running as script or exe
+        if getattr(sys, 'frozen', False):
+            # Running as exe
+            self.base_path = os.path.dirname(sys.executable)
+        else:
+            # Running as script
+            self.base_path = os.path.dirname(os.path.abspath(__file__))
+        
+        # Load settings from JSON file with correct path
+        self.settings_file = os.path.join(self.base_path, "settings.json")
+        self.assignments_file = os.path.join(self.base_path, "assignments.json")
+        
         self.settings = self.load_settings()
         
         # Initialize settings with default values but prefer loaded settings
@@ -257,7 +267,6 @@ class VU1GUI(QMainWindow):
         self.sensor_assignments = {}
         self.min_values = {}
         self.max_values = {}
-        self.assignments_file = "assignments.json"
         
         # GUI setup
         self.setup_ui()
