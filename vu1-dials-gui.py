@@ -3,6 +3,9 @@ import os
 import json
 import requests
 import winreg
+import win32gui
+import win32con
+import win32api
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
     QHBoxLayout, QLabel, QPushButton, QLineEdit, QComboBox, QCheckBox,
     QSpinBox, QColorDialog, QFileDialog, QMessageBox, QDialog, QFrame, QLayout,
@@ -227,17 +230,19 @@ class VU1GUI(QMainWindow):
     def __init__(self):
         super().__init__()
         
+        # Register for Windows shutdown events
+        self.register_shutdown_handler()
+        
         # Load settings from JSON file
-        self.settings_file = "settings.json"
+        self.settings_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
         self.settings = self.load_settings()
         
-        # Initialize settings with default values
+        # Initialize settings with default values but prefer loaded settings
         self.autostart_enabled = self.settings.get("autostart", False)
         self.minimize_to_tray = self.settings.get("minimize_to_tray", False)
-        self.start_in_tray = self.settings.get("start_in_tray", False)  # Neue Einstellung
-        self.server_address = self.settings.get("server_address", "http://localhost:5340")
-        self.api_key = self.settings.get("api_key", "")
-        self.backlight_values = {}  # Neue Variable für Backlight-Werte
+        self.start_in_tray = self.settings.get("start_in_tray", False)
+        self.server_address = self.settings.get("server_address", "")  # Changed to empty string
+        self.api_key = self.settings.get("api_key", "")  # Changed to empty string
         
         # Basic window setup
         self.setWindowTitle("VU1 GUI")
@@ -296,15 +301,39 @@ class VU1GUI(QMainWindow):
         else:
             self.show()
 
+    def register_shutdown_handler(self):
+        """Register Windows event handler for shutdown"""
+        def wnd_proc(hwnd, msg, wparam, lparam):
+            if msg == win32con.WM_QUERYENDSESSION:
+                self.shutdown_dials()
+                return True
+            return False
+
+        # Create a hidden window to receive windows messages
+        wc = win32gui.WNDCLASS()
+        wc.lpfnWndProc = wnd_proc
+        wc.lpszClassName = "VU1GUIShutdownHandler"
+        try:
+            win32gui.RegisterClass(wc)
+            self.hwnd = win32gui.CreateWindow(
+                wc.lpszClassName,
+                "VU1GUI",
+                0, 0, 0, 0, 0,
+                0, 0, 0, None
+            )
+        except Exception as e:
+            print(f"Error registering shutdown handler: {e}")
+
     def load_settings(self):
         """Loads the settings from the JSON file"""
         try:
             if os.path.exists(self.settings_file):
                 with open(self.settings_file, "r") as file:
                     settings = json.load(file)
+                    # Validate required settings
+                    if not settings.get("server_address") or not settings.get("api_key"):
+                        return {}
                     return settings
-            return {}
-        except FileNotFoundError:
             return {}
         except Exception as e:
             print(f"Error loading settings: {e}")
@@ -953,21 +982,27 @@ class VU1GUI(QMainWindow):
         """Set all dials to 0 and turn off the light."""
         try:
             for dial_id in self.dial_widgets.keys():
-                # Set value to 0
-                url = f"{self.server_address}/api/v0/dial/{dial_id}/set"
-                params = {"key": self.api_key, "value": 0}
-                requests.get(url, params=params)
-                
-                # Turn off backlight
-                url = f"{self.server_address}/api/v0/dial/{dial_id}/backlight"
-                params = {
-                    "key": self.api_key,
-                    "red": 0,
-                    "green": 0,
-                    "blue": 0
-                }
-                requests.get(url, params=params)
-                
+                try:
+                    # Set value to 0
+                    url = f"{self.server_address}/api/v0/dial/{dial_id}/set"
+                    params = {"key": self.api_key, "value": 0}
+                    requests.get(url, params=params, timeout=1)
+                    
+                    # Turn off backlight
+                    url = f"{self.server_address}/api/v0/dial/{dial_id}/backlight"
+                    params = {
+                        "key": self.api_key,
+                        "red": 0,
+                        "green": 0,
+                        "blue": 0
+                    }
+                    requests.get(url, params=params, timeout=1)
+                except requests.exceptions.Timeout:
+                    continue  # Skip to next dial if timeout occurs
+                except Exception as e:
+                    print(f"Error shutting down dial {dial_id}: {e}")
+                    continue
+                    
         except Exception as e:
             print(f"Error when shutting down the dials: {e}")
 
