@@ -3,9 +3,6 @@ import os
 import json
 import requests
 import winreg
-import win32gui
-import win32con
-import win32api
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
     QHBoxLayout, QLabel, QPushButton, QLineEdit, QComboBox, QCheckBox,
     QSpinBox, QColorDialog, QFileDialog, QMessageBox, QDialog, QFrame, QLayout,
@@ -230,7 +227,7 @@ class VU1GUI(QMainWindow):
     def __init__(self):
         super().__init__()
         
-        # Instead, connect to QApplication's aboutToQuit signal
+        # Connect to QApplication's aboutToQuit signal
         QApplication.instance().aboutToQuit.connect(self.shutdown_dials)
         
         # Load settings from JSON file
@@ -990,5 +987,4 @@ if __name__ == "__main__":
     window = VU1GUI()
     # window.show() has been moved to the __init__ method
     sys.exit(app.exec())
-``` 
 
