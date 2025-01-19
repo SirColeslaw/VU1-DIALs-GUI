@@ -241,7 +241,7 @@ class VU1GUI(QMainWindow):
         self.autostart_enabled = self.settings.get("autostart", False)
         self.minimize_to_tray = self.settings.get("minimize_to_tray", False)
         self.start_in_tray = self.settings.get("start_in_tray", False)
-        self.server_address = self.settings.get("server_address", "")  # Changed to empty string
+        self.server_address = self.settings.get("server_address", "http://localhost:5340")  # Set default server address
         self.api_key = self.settings.get("api_key", "")  # Changed to empty string
         self.backlight_values = {}  # Initialize backlight_values
         
