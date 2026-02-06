@@ -2,7 +2,8 @@
 Settings and assignments management.
 
 Handles loading, saving, and validating application settings
-and per-dial sensor assignments from JSON files.
+and per-dial sensor assignments from JSON files. The API key
+is encrypted at rest using the crypto module.
 """
 
 import json
@@ -17,6 +18,7 @@ from ..constants import (
     DEFAULT_SERVER_ADDRESS,
     SETTINGS_FILENAME,
 )
+from .crypto import decrypt_api_key, encrypt_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,10 @@ class SettingsManager:
     def load_settings(self) -> dict[str, Any]:
         """Load application settings from the JSON file.
 
+        The API key is decrypted transparently. Plaintext keys from
+        older settings files are accepted and will be encrypted on
+        the next save.
+
         Returns:
             A dictionary of settings, or empty dict if loading fails
             or required fields are missing.
@@ -66,6 +72,10 @@ class SettingsManager:
                     if not settings.get("server_address") or not settings.get("api_key"):
                         logger.warning("Settings file missing required fields (server_address/api_key)")
                         return {}
+                    # Decrypt the API key
+                    settings["api_key"] = decrypt_api_key(
+                        settings["api_key"], self.base_path,
+                    )
                     return settings
             logger.info("No settings file found at %s, using defaults", self.settings_file)
             return {}
@@ -83,9 +93,12 @@ class SettingsManager:
     ) -> bool:
         """Save application settings to the JSON file.
 
+        The API key is encrypted before writing so it is never
+        stored in plaintext.
+
         Args:
             server_address: The VU1 server URL.
-            api_key: The API authentication key.
+            api_key: The API authentication key (plaintext).
             minimize_to_tray: Whether to minimize to system tray.
             start_in_tray: Whether to start minimized in tray.
             autostart: Whether to start with Windows.
@@ -96,7 +109,7 @@ class SettingsManager:
         try:
             settings = {
                 "server_address": server_address,
-                "api_key": api_key,
+                "api_key": encrypt_api_key(api_key, self.base_path),
                 "minimize_to_tray": minimize_to_tray,
                 "start_in_tray": start_in_tray,
                 "autostart": autostart,

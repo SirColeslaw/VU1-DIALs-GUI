@@ -4,6 +4,8 @@ Application-wide constants and default values.
 Centralizes all hardcoded values to make configuration and maintenance easier.
 """
 
+import re
+
 # --- Application Metadata ---
 APP_NAME: str = "VU1 DIALs GUI"
 APP_TITLE: str = "VU1 GUI"
@@ -86,3 +88,12 @@ SUPPORTED_IMAGE_EXTENSIONS: tuple[str, ...] = (".png", ".jpg", ".jpeg")
 # --- Windows Autostart ---
 AUTOSTART_REGISTRY_PATH: str = r"Software\Microsoft\Windows\CurrentVersion\Run"
 AUTOSTART_APP_NAME: str = "VU1_DIALS_GUI"
+
+# --- API Authentication ---
+API_KEY_HEADER: str = "X-API-Key"
+
+# --- Input Validation ---
+DIAL_NAME_MAX_LENGTH: int = 64
+# Allow letters (unicode), digits, spaces, hyphens, underscores, dots
+DIAL_NAME_PATTERN: re.Pattern = re.compile(r"[^\w\s\-.]", re.UNICODE)
+SERVER_ADDRESS_SCHEMES: tuple[str, ...] = ("http", "https")

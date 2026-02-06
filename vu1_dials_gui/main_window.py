@@ -29,6 +29,13 @@ from PyQt6.QtWidgets import (
 
 from .api.client import VU1ApiClient
 from .config.settings import SettingsManager
+from .validation import (
+    sanitize_dial_name,
+    validate_api_key,
+    validate_dial_name,
+    validate_server_address,
+    validate_value_range,
+)
 from .constants import (
     AUTOSTART_APP_NAME,
     AUTOSTART_REGISTRY_PATH,
@@ -314,7 +321,7 @@ class VU1GUI(QMainWindow):
     # ── Settings Dialog ───────────────────────────────────────────────
 
     def _show_settings_dialog(self) -> None:
-        """Open the settings dialog and validate/save user input."""
+        """Open the settings dialog, validate all inputs, and save."""
         dialog = SettingsDialog(self)
         dialog.server_input.setText(self.server_address)
         dialog.api_key_input.setText(self.api_key)
@@ -323,29 +330,36 @@ class VU1GUI(QMainWindow):
         dialog.start_in_tray.setChecked(self.start_in_tray)
 
         if dialog.exec():
-            # Validate API key
-            if not dialog.api_key_input.text().strip():
+            # Validate server address format
+            server_addr = dialog.server_input.text().strip()
+            valid, msg = validate_server_address(server_addr)
+            if not valid:
                 QMessageBox.critical(
-                    self, "Error",
-                    "No API key was provided!\nPlease enter a valid API key.",
-                    QMessageBox.StandardButton.Ok,
+                    self, "Error", msg, QMessageBox.StandardButton.Ok,
+                )
+                self._show_settings_dialog()
+                return
+
+            # Validate API key
+            api_key = dialog.api_key_input.text().strip()
+            valid, msg = validate_api_key(api_key)
+            if not valid:
+                QMessageBox.critical(
+                    self, "Error", msg, QMessageBox.StandardButton.Ok,
                 )
                 self._show_settings_dialog()
                 return
 
             # Validate server connectivity
             try:
-                self.api_client.test_connection(
-                    dialog.server_input.text().strip(),
-                    dialog.api_key_input.text(),
-                )
+                self.api_client.test_connection(server_addr, api_key)
             except Exception as e:
-                self._handle_connection_error(e, dialog.server_input.text())
+                self._handle_connection_error(e, server_addr)
                 return
 
             # Save validated settings
-            self.server_address = dialog.server_input.text()
-            self.api_key = dialog.api_key_input.text()
+            self.server_address = server_addr
+            self.api_key = api_key
             self.minimize_to_tray = dialog.minimize_to_tray.isChecked()
             self.start_in_tray = dialog.start_in_tray.isChecked()
 
@@ -520,17 +534,24 @@ class VU1GUI(QMainWindow):
             QMessageBox.warning(self, "Error", f"Error setting image: {e}")
 
     def _set_dial_name(self, dial_id: str, new_name: str) -> None:
-        """Set a new display name for a dial via the API.
+        """Sanitize, validate, and set a new display name for a dial.
 
         Args:
             dial_id: The unique identifier of the dial.
-            new_name: The new name to set.
+            new_name: The raw name input from the user.
         """
         try:
-            if self.api_client.set_dial_name(dial_id, new_name):
+            # Sanitize and validate the name
+            sanitized = sanitize_dial_name(new_name)
+            valid, msg = validate_dial_name(sanitized)
+            if not valid:
+                QMessageBox.warning(self, "Error", msg)
+                return
+
+            if self.api_client.set_dial_name(dial_id, sanitized):
                 details = self.api_client.fetch_dial_details(dial_id)
                 self._update_dial_widget_with_data(self.dial_widgets[dial_id], details)
-                self.statusBar().showMessage(f"Name for dial {dial_id} set to '{new_name}'")
+                self.statusBar().showMessage(f"Name for dial {dial_id} set to '{sanitized}'")
             else:
                 QMessageBox.warning(self, "Error", "Error setting name.")
         except Exception as e:
@@ -593,7 +614,7 @@ class VU1GUI(QMainWindow):
             QMessageBox.warning(self, "Error", f"Error assigning sensor: {e}")
 
     def _set_value_range(self, dial_id: str, min_value: int, max_value: int) -> None:
-        """Save the value range for a dial and update immediately.
+        """Validate and save the value range for a dial, then update.
 
         Args:
             dial_id: The unique identifier of the dial.
@@ -601,6 +622,11 @@ class VU1GUI(QMainWindow):
             max_value: The maximum sensor value for mapping.
         """
         try:
+            valid, msg = validate_value_range(int(min_value), int(max_value))
+            if not valid:
+                QMessageBox.warning(self, "Error", msg)
+                return
+
             self.min_values[dial_id] = int(min_value)
             self.max_values[dial_id] = int(max_value)
             self._save_assignments()

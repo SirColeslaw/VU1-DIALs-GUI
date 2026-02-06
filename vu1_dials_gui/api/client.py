@@ -3,6 +3,10 @@ VU1 Server REST API client.
 
 Provides methods for all interactions with the VU1 dial hardware
 server, including dial control, image management, and backlight settings.
+
+Authentication is sent both via HTTP header (``X-API-Key``) and as a
+query parameter (``key``) for backward compatibility with servers that
+only support query-parameter authentication.
 """
 
 import logging
@@ -10,8 +14,10 @@ from typing import Any
 
 import requests
 
+from ..config.crypto import mask_api_key
 from ..constants import (
     API_BASE_PATH,
+    API_KEY_HEADER,
     ENDPOINT_DIAL_BACKLIGHT,
     ENDPOINT_DIAL_EASING,
     ENDPOINT_DIAL_IMAGE_GET,
@@ -34,6 +40,9 @@ class VU1ApiClient:
 
     Handles all communication with the VU1 dial hardware server,
     including authentication, error handling, and response parsing.
+
+    The API key is sent via the ``X-API-Key`` HTTP header and also
+    as a ``key`` query parameter for backward compatibility.
     """
 
     def __init__(self, server_address: str, api_key: str) -> None:
@@ -58,6 +67,20 @@ class VU1ApiClient:
         """
         return f"{self.server_address}{API_BASE_PATH}/{endpoint.format(**kwargs)}"
 
+    def _auth_headers(self, extra: dict[str, str] | None = None) -> dict[str, str]:
+        """Build request headers including the API key authentication header.
+
+        Args:
+            extra: Additional headers to merge.
+
+        Returns:
+            A headers dictionary with authentication and any extras.
+        """
+        hdrs: dict[str, str] = {API_KEY_HEADER: self.api_key}
+        if extra:
+            hdrs.update(extra)
+        return hdrs
+
     def _get(
         self,
         endpoint: str,
@@ -67,6 +90,9 @@ class VU1ApiClient:
         **url_kwargs: str,
     ) -> requests.Response:
         """Send an authenticated GET request to the API.
+
+        The API key is sent both as an ``X-API-Key`` header and as
+        a ``key`` query parameter for backward compatibility.
 
         Args:
             endpoint: The endpoint path template.
@@ -82,10 +108,16 @@ class VU1ApiClient:
             requests.RequestException: On any HTTP error.
         """
         url = self._build_url(endpoint, **url_kwargs)
-        request_params = {"key": self.api_key}
+        # Query param kept for backward compat with servers that don't read headers
+        request_params: dict[str, Any] = {"key": self.api_key}
         if params:
             request_params.update(params)
-        return requests.get(url, params=request_params, headers=headers, timeout=timeout)
+        return requests.get(
+            url,
+            params=request_params,
+            headers=self._auth_headers(headers),
+            timeout=timeout,
+        )
 
     def _post(
         self,
@@ -95,6 +127,9 @@ class VU1ApiClient:
         **url_kwargs: str,
     ) -> requests.Response:
         """Send an authenticated POST request to the API.
+
+        The API key is sent both as an ``X-API-Key`` header and as
+        a ``key`` query parameter for backward compatibility.
 
         Args:
             endpoint: The endpoint path template.
@@ -109,8 +144,14 @@ class VU1ApiClient:
             requests.RequestException: On any HTTP error.
         """
         url = self._build_url(endpoint, **url_kwargs)
-        params = {"key": self.api_key}
-        return requests.post(url, params=params, files=files, timeout=timeout)
+        params: dict[str, Any] = {"key": self.api_key}
+        return requests.post(
+            url,
+            params=params,
+            files=files,
+            headers=self._auth_headers(),
+            timeout=timeout,
+        )
 
     def test_connection(self, server_address: str, api_key: str) -> requests.Response:
         """Test connectivity to the VU1 server with given credentials.
@@ -128,7 +169,16 @@ class VU1ApiClient:
             requests.RequestException: On other HTTP errors.
         """
         url = f"{server_address}{API_BASE_PATH}/{ENDPOINT_DIAL_LIST}"
-        response = requests.get(url, params={"key": api_key}, timeout=REQUEST_TIMEOUT)
+        logger.info(
+            "Testing connection to %s with key %s",
+            server_address, mask_api_key(api_key),
+        )
+        response = requests.get(
+            url,
+            params={"key": api_key},
+            headers={API_KEY_HEADER: api_key},
+            timeout=REQUEST_TIMEOUT,
+        )
         response.raise_for_status()
         return response
 
