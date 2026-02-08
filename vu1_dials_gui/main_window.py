@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
 
 from .api.client import VU1ApiClient
 from .config.settings import SettingsManager
+from .utils import map_value_to_range
 from .validation import (
     sanitize_dial_name,
     validate_api_key,
@@ -437,7 +438,7 @@ class VU1GUI(QMainWindow):
                 value = float(sensor_data["value"])
                 min_val = self.min_values.get(dial_id, DEFAULT_MIN_VALUE)
                 max_val = self.max_values.get(dial_id, DEFAULT_MAX_VALUE)
-                mapped_value = self._map_value_to_range(value, min_val, max_val)
+                mapped_value = map_value_to_range(value, min_val, max_val)
                 self.api_client.set_dial_value(dial_id, mapped_value)
         except Exception as e:
             logger.error("Error updating dial %s: %s", dial_id, e)
@@ -456,22 +457,6 @@ class VU1GUI(QMainWindow):
             logger.error("Error retrieving AIDA64 data: %s", e)
             return {}
 
-    @staticmethod
-    def _map_value_to_range(value: float, min_value: float, max_value: float) -> float:
-        """Map a sensor value to the 0-100 dial range.
-
-        Args:
-            value: The raw sensor value.
-            min_value: The configured minimum of the sensor range.
-            max_value: The configured maximum of the sensor range.
-
-        Returns:
-            The mapped value clamped to 0-100.
-        """
-        try:
-            return max(0.0, min(100.0, ((value - min_value) / (max_value - min_value)) * 100))
-        except (ZeroDivisionError, TypeError):
-            return 0.0
 
     # ── Dial API Actions ──────────────────────────────────────────────
 
