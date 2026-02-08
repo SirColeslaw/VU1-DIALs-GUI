@@ -22,6 +22,11 @@ def map_value_to_range(value: float, min_value: float, max_value: float) -> floa
         The mapped value clamped to 0-100.
     """
     try:
-        return max(0.0, min(100.0, ((value - min_value) / (max_value - min_value)) * 100))
+        # Linear interpolation: shift value so that min_value becomes 0,
+        # divide by the range width to get a 0.0–1.0 fraction, then scale
+        # to 0–100 for the VU1 dial's percentage input.
+        # Clamp to [0, 100] so out-of-range sensor readings are safe.
+        fraction = (value - min_value) / (max_value - min_value)
+        return max(0.0, min(100.0, fraction * 100))
     except (ZeroDivisionError, TypeError):
         return 0.0

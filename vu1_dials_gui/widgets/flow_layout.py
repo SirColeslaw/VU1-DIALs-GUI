@@ -105,6 +105,15 @@ class FlowLayout(QLayout):
         Arranges items left-to-right with wrapping. When test_only is True,
         only calculates the required height without moving widgets.
 
+        Algorithm:
+            Walk through all items, tracking the current x/y cursor position.
+            For each item, compute where its right edge would land (next_x).
+            If placing the item would exceed the container width *and* there
+            is already content on the current row (line_height > 0), wrap to
+            a new row by resetting x and advancing y by the tallest item in
+            the completed row plus vertical spacing.  line_height tracks the
+            tallest item on the current row so the next row starts below it.
+
         Args:
             rect: The available rectangle for layout.
             test_only: If True, only calculate height without moving items.
@@ -114,12 +123,17 @@ class FlowLayout(QLayout):
         """
         x = rect.x()
         y = rect.y()
-        line_height = 0
+        line_height = 0  # Height of the tallest item in the current row
         self._rows = []
         current_row: list[QLayoutItem] = []
 
         for item in self._items:
+            # Calculate where the right edge of this item would be
             next_x = x + item.sizeHint().width() + FLOW_LAYOUT_SPACING_X
+
+            # Wrap to a new row if the item overflows the container width.
+            # The "line_height > 0" guard ensures the first item on a row
+            # is always placed even if it is wider than the container.
             if next_x - FLOW_LAYOUT_SPACING_X > rect.right() and line_height > 0:
                 self._rows.append(current_row)
                 current_row = []

@@ -136,10 +136,25 @@ class DialWidget(QFrame):
         self.main_layout.addWidget(range_frame)
 
     def _setup_easing_controls(self) -> None:
-        """Create easing period/step inputs and save button."""
+        """Create easing period/step inputs and save button.
+
+        Easing controls how smoothly the physical dial needle moves to a
+        new value instead of jumping instantly.  The VU1 Server firmware
+        interpolates between the current and target position using two
+        parameters:
+
+        - **Period** (ms): How often the firmware advances the needle
+          toward the target.  Lower values = faster updates.
+        - **Step** (%): The maximum percentage the needle may move in a
+          single period tick.  Lower values = smoother but slower motion.
+
+        Example: period=50, step=5 → the needle moves at most 5% every
+        50 ms, taking up to 1 second to traverse the full 0–100 range.
+        """
         easing_frame = QFrame()
         easing_layout = QVBoxLayout(easing_frame)
 
+        # Period: interval between firmware interpolation ticks (ms)
         period_layout = QHBoxLayout()
         period_layout.addWidget(QLabel("Update Period (ms):"))
         self.period_spin = QSpinBox()
@@ -148,6 +163,7 @@ class DialWidget(QFrame):
         period_layout.addWidget(self.period_spin)
         easing_layout.addLayout(period_layout)
 
+        # Step: max needle travel per tick (% of full range)
         step_layout = QHBoxLayout()
         step_layout.addWidget(QLabel("Max Step (%):"))
         self.step_spin = QSpinBox()

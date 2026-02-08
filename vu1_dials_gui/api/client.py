@@ -323,6 +323,9 @@ class VU1ApiClient:
             True if the backlight was set successfully, False otherwise.
         """
         try:
+            # The UI uses standard 0-255 RGB values, but the VU1 Server API
+            # expects brightness percentages (0-100).  Convert each channel:
+            #   pct = int((channel / 255) * 100)  →  e.g. 255 → 100, 128 → 50
             red_pct = int((red / RGB_MAX) * RGB_API_MAX)
             green_pct = int((green / RGB_MAX) * RGB_API_MAX)
             blue_pct = int((blue / RGB_MAX) * RGB_API_MAX)
