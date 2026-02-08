@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
 
 from .api.client import VU1ApiClient
 from .config.settings import SettingsManager
+from .platform import HAS_AIDA64, HAS_WINREG, IS_WINDOWS
 from .utils import map_value_to_range
 from .validation import (
     sanitize_dial_name,
@@ -447,9 +448,14 @@ class VU1GUI(QMainWindow):
     def _fetch_aida64_data() -> dict[str, Any]:
         """Fetch the latest sensor data from AIDA64 shared memory.
 
+        Returns an empty dict on non-Windows platforms or when
+        AIDA64 / python_aida64 is not available.
+
         Returns:
             A dictionary of sensor categories and their readings.
         """
+        if not HAS_AIDA64:
+            return {}
         try:
             from python_aida64 import getData
             return getData()
@@ -744,11 +750,26 @@ class VU1GUI(QMainWindow):
         self.move(x, y)
 
     def _set_autostart(self, enable: bool) -> None:
-        """Configure Windows autostart via the registry.
+        """Configure autostart with the operating system.
+
+        On Windows, uses the registry (winreg). On other platforms,
+        logs a warning and does nothing, since autostart is not yet
+        supported there.
 
         Args:
             enable: True to enable autostart, False to disable.
         """
+        if not HAS_WINREG:
+            logger.warning(
+                "Autostart is only supported on Windows. "
+                "Skipping autostart configuration on this platform."
+            )
+            QMessageBox.information(
+                self, "Not Available",
+                "Autostart is currently only supported on Windows.",
+            )
+            return
+
         try:
             import winreg
 

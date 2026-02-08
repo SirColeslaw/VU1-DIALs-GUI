@@ -15,6 +15,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ..platform import HAS_WINREG
+
 
 class SettingsDialog(QDialog):
     """Modal dialog for editing application settings.
@@ -47,9 +49,10 @@ class SettingsDialog(QDialog):
         self.minimize_to_tray = QCheckBox("Minimize to Tray")
         layout.addWidget(self.minimize_to_tray)
 
-        # Autostart Option
+        # Autostart Option (Windows only)
         self.autostart = QCheckBox("Start with Windows")
-        layout.addWidget(self.autostart)
+        if HAS_WINREG:
+            layout.addWidget(self.autostart)
 
         # Start in Tray Option
         self.start_in_tray = QCheckBox("Start minimized to Tray")
