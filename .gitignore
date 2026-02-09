@@ -8,3 +8,7 @@ build/
 .vu1_keyfile
 settings.json
 assignments.json
+
+# PyInstaller
+*.manifest
+*.spec.bak
