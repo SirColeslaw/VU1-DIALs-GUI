@@ -20,7 +20,7 @@ a = Analysis(
     binaries=[],
     datas=[
         # Include icon if present
-        ('icon.png', '.') if Path('icon.png').exists() else (None, None),
+        *([('icon.png', '.')] if Path('icon.png').exists() else []),
     ],
     hiddenimports=[
         'vu1_dials_gui',
@@ -61,9 +61,6 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
-
-# Filter out None entries from datas (icon.png may not exist)
-a.datas = [(dest, src, typ) for dest, src, typ in a.datas if dest is not None]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
