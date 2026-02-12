@@ -42,7 +42,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install PyQt6 requests Pillow cryptography pyinstaller
-          pip install python_aida64 || echo "python_aida64 not available on PyPI, skipping (optional)"
+
+      - name: Install optional AIDA64 dependency
+        run: pip install python_aida64
+        continue-on-error: true
 
       - name: Build with PyInstaller
         run: pyinstaller vu1-dials-gui.spec
