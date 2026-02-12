@@ -1,0 +1,106 @@
+name: Build & Release
+
+# Trigger on version tags (e.g. v1.0.0, v1.2.3-beta)
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write  # Required to create releases and upload assets
+
+jobs:
+  # ── Run tests first ─────────────────────────────────────────────
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest requests cryptography
+      - name: Run tests
+        run: pytest -v --tb=short
+
+  # ── Build Windows .exe ──────────────────────────────────────────
+  build-windows:
+    name: Build Windows Executable
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install PyQt6 requests Pillow cryptography pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller vu1-dials-gui.spec
+
+      - name: Verify build output
+        run: |
+          if (Test-Path "dist/VU1-DIALs-GUI.exe") {
+            $size = (Get-Item "dist/VU1-DIALs-GUI.exe").Length / 1MB
+            Write-Host "Build successful: VU1-DIALs-GUI.exe ($([math]::Round($size, 1)) MB)"
+          } else {
+            Write-Error "Build failed: VU1-DIALs-GUI.exe not found"
+            exit 1
+          }
+        shell: pwsh
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VU1-DIALs-GUI-Windows
+          path: dist/VU1-DIALs-GUI.exe
+          retention-days: 5
+
+  # ── Create GitHub Release ───────────────────────────────────────
+  release:
+    name: Create Release
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: VU1-DIALs-GUI-Windows
+          path: release-assets/
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "VU1 DIALs GUI ${{ github.ref_name }}"
+          body: |
+            ## VU1 DIALs GUI ${{ github.ref_name }}
+
+            ### Downloads
+            - **Windows**: `VU1-DIALs-GUI.exe` — standalone executable, no installation required
+
+            ### Requirements
+            - [VU1 Server](https://docs.vudials.com) running and accessible
+            - [AIDA64](https://www.aida64.com) with Shared Memory enabled (for sensor data)
+            - Streacom VU1 dial hardware
+
+            ### What's Changed
+            See the [full changelog](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) for details.
+          files: |
+            release-assets/VU1-DIALs-GUI.exe
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true

@@ -1,0 +1,6 @@
+PyQt6>=6.4
+requests>=2.28
+Pillow>=9.0
+
+# Optional: encrypted API key storage
+# cryptography>=41.0
