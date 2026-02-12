@@ -21,7 +21,7 @@ jobs:
           python-version: "3.12"
       - name: Install test dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install pytest requests cryptography
       - name: Run tests
         run: pytest -v --tb=short
@@ -40,8 +40,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install PyQt6 requests Pillow cryptography python_aida64 pyinstaller
+          python -m pip install --upgrade pip
+          pip install PyQt6 requests Pillow cryptography pyinstaller
+          pip install python_aida64 || echo "python_aida64 not available on PyPI, skipping (optional)"
 
       - name: Build with PyInstaller
         run: pyinstaller vu1-dials-gui.spec
