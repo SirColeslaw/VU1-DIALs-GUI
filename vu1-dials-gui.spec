@@ -39,8 +39,8 @@ a = Analysis(
         'vu1_dials_gui.widgets.dial_widget',
         'vu1_dials_gui.widgets.flow_layout',
         'vu1_dials_gui.widgets.settings_dialog',
+        'vu1_dials_gui.aida64',
         # Optional dependencies — included if installed
-        'python_aida64',
         'cryptography',
         'cryptography.fernet',
     ],

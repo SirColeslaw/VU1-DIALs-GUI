@@ -449,7 +449,7 @@ class VU1GUI(QMainWindow):
         """Fetch the latest sensor data from AIDA64 shared memory.
 
         Returns an empty dict on non-Windows platforms or when
-        AIDA64 / python_aida64 is not available.
+        AIDA64 shared memory is unavailable.
 
         Returns:
             A dictionary of sensor categories and their readings.
@@ -457,8 +457,8 @@ class VU1GUI(QMainWindow):
         if not HAS_AIDA64:
             return {}
         try:
-            from python_aida64 import getData
-            return getData()
+            from .aida64 import get_data
+            return get_data()
         except Exception as e:
             logger.error("Error retrieving AIDA64 data: %s", e)
             return {}

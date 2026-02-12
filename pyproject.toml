@@ -31,7 +31,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-aida64 = ["python_aida64"]
 crypto = ["cryptography>=41.0"]
 dev = [
     "pytest>=7.0",

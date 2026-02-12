@@ -43,10 +43,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install PyQt6 requests Pillow cryptography pyinstaller
 
-      - name: Install optional AIDA64 dependency
-        run: pip install python_aida64
-        continue-on-error: true
-
       - name: Build with PyInstaller
         run: pyinstaller vu1-dials-gui.spec
 
